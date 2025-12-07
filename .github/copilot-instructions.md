@@ -1,10 +1,48 @@
 **Repository Summary**
-- **What**: A small React + Vite front-end with a lightweight Express backend proxy used for calling the Google GenAI (Gemini) API. The app is a health assistant called VitalSync.
-- **Where**: Frontend sources in the repo root (`App.tsx`, `index.tsx`, `components/`) and AI integration code under `services/` (`geminiService.ts`, `storageService.ts`). The backend proxy is `server.js`.
+**Repository Overview**
++ **What**: Frontend (React + Vite) + optional Express proxy / serverless API for calling Google GenAI (Gemini). App name: VitalSync (health assistant).
++ **Structure**: Frontend at repo root (`App.tsx`, `index.tsx`, `components/`); AI helpers in `services/`; server proxy `server.js`; serverless handlers in `api/`.
 
-**How AI is integrated**
-- **Client vs Backend**: `services/geminiService.ts` switches between direct client SDK calls and a local backend proxy using the `USE_BACKEND` constant. When `USE_BACKEND` is `false` the client calls `@google/genai` directly; when `true` the client POSTs to `http://localhost:5000/api` and the server (`server.js`) uses the server-side API key.
-- **Key model**: current code uses model id `'gemini-2.5-flash'` in both client and server flows.
+**Run & Debug (key commands)**
+- **Install**: `npm install`
+- **Start backend proxy**: `npm run server` (runs `node server.js`, default port `5000`)
+- **Start frontend**: `npm run dev` (Vite dev server)
+- **Build / preview**: `npm run build` / `npm run preview`
+
+**AI Integration — essential facts**
+- `services/geminiService.ts` controls client-side vs backend flows via `VITE_USE_BACKEND` / `USE_BACKEND`.
+- If `USE_BACKEND=true` the client POSTs to `VITE_BACKEND_URL` (default `http://localhost:5000/api`) and `server.js` uses `process.env.GEMINI_API_KEY`.
+- Direct client calls use `@google/genai` with `VITE_GEMINI_API_KEY` exposed to the browser.
+- Model used throughout: `gemini-2.5-flash` (see `geminiService.ts` and `server.js`).
+
+**Key files to inspect when changing behavior**
+- `services/geminiService.ts` — functions: `generateHealthResponse`, `analyzeFoodImage`, `predictWaterNeeds`, `analyzeMoodAndSuggest`. Follow existing `parts` → `contents` pattern (system instruction, optional `inlineData`, user text).
+- `server.js` — local Express proxy endpoints: `/api/chat`, `/api/analyze-food`, `/api/predict-water`, `/api/analyze-mood`. It uses `GoogleGenAI` server-side with `GEMINI_API_KEY`.
+- `services/storageService.ts` — localStorage keys: `vitalsync_profile`, `vitalsync_logs`, `vitalsync_token` (use these for state consistency).
+- `api/` — serverless handlers (mirrors `server.js`) for deployments like Vercel.
+
+**API shapes and parsing rules (must-follow)**
+- `/api/chat` body: `{ message, context?, image? }` → response: `{ text: string }` (client expects `.text`).
+- `/api/analyze-food` body: `{ image }` → response: a JSON object: `{ "foodName": string, "calories": number, "protein": number, "carbs": number, "fats": number, "healthy": boolean, "advice": string }`.
+- `/api/predict-water` body: `{ weather, activity, weight }` → response: `{ "water_needs": number }`.
+- `/api/analyze-mood` body: `{ diary }` → response: `{ "sentiment": string, "suggestion": string }`.
+- Parsers defensively handle double-encoded JSON: callers use `typeof data === 'string' ? JSON.parse(data) : data`.
+
+**Project conventions & gotchas**
+- Prompts for analytic endpoints explicitly require raw JSON only. Do not add markdown or explanatory text — client code parses JSON directly (`responseMimeType: 'application/json'` is used).
+- Images are passed as Data URLs on the client; both client and server strip the `data:*;base64,` header and send only base64 data to Gemini.
+- Vite client env vars must use `VITE_` prefix (`VITE_GEMINI_API_KEY`, `VITE_USE_BACKEND`, `VITE_BACKEND_URL`). Server secrets use `GEMINI_API_KEY` or `API_KEY`.
+
+**When editing or adding AI endpoints**
+- Keep system instructions first in `parts`, add `inlineData` for images, then user text. Mirror the server `responseMimeType: 'application/json'` when you need machine-readable output.
+- Update both `services/geminiService.ts` and `server.js` (or `api/*`) to keep client & backend in sync.
+
+**PR checklist for AI changes**
+- Update prompt text and document expected JSON shape in a comment near the function.
+- Verify both flows locally: 1) direct client with `VITE_GEMINI_API_KEY`, 2) proxy flow with `GEMINI_API_KEY` and `VITE_USE_BACKEND=true`.
+- Run the app and test the endpoint with sample payloads (Postman/curl or client UI).
+
+If you'd like, I can expand this with CI/deploy notes or add short sample prompts and unit examples. Tell me which section to expand.
 - **Image handling**: chat and food-analysis send data URLs (e.g. `data:image/jpeg;base64,...`). Both client and server strip the header and send only base64 data to the GenAI API.
 
 **Important files and patterns**
