@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Sidebar, { MobileNav } from './components/Sidebar.tsx';
+import Sidebar, { MobileNav } from './components/Sidebar.
 import Dashboard from './components/Dashboard';
 import DailyTracker from './components/DailyTracker';
 import FoodScanner from './components/FoodScanner';
